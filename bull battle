@@ -136,9 +136,19 @@ end)
 -- TP UNDER PLAYERS (перенесено из Kill ppl)
 ---------------------------------------------------------------------
 
+---------------------------------------------------------------------
+-- TP UNDER PLAYERS (теперь как AutoSpawn)
+---------------------------------------------------------------------
+
 local tp_on = false
 local tp_offset = -6
 local tp_speed = 0.25
+
+local function isOnArena(plr)
+    local riders = workspace:FindFirstChild("Riders")
+    if not riders then return false end
+    return riders:FindFirstChild(plr.Name) ~= nil
+end
 
 tabCombat:CreateToggle({
     Name="TP under players",
@@ -164,17 +174,25 @@ tabCombat:CreateSlider({
 
 Run.Heartbeat:Connect(function()
     if not tp_on then return end
+
     local t = nearest()
     if not t then return end
+
+    -- ❗ Новый фильтр: игрок должен быть на арене
+    if not isOnArena(t) then return end
+
     local c = char(lp)
     local r = hrp(c)
     if not c or not r then return end
+
     local tc = char(t)
     local tr = hrp(tc)
     if not tc or not tr then return end
+
     local goal = tr.CFrame * CFrame.new(0, tp_offset, 0)
     Tween:Create(r, TweenInfo.new(tp_speed, Enum.EasingStyle.Linear), {CFrame = goal}):Play()
 end)
+
 
 ---------------------------------------------------------------------
 -- SHOW TARGET (перенесено из Shit)
