@@ -17,7 +17,6 @@ local Window = UI:CreateWindow({
 })
 
 local tabCombat = Window:CreateTab("Combat", 4483362458)
-local tabKill   = Window:CreateTab("Kill ppl", 4483362458)
 local tabTower  = Window:CreateTab("Tower & Team", 4483362458)
 local tabChest  = Window:CreateTab("Chest", 4483362458)
 local tabShit   = Window:CreateTab("Shit", 4483362458)
@@ -40,7 +39,7 @@ local function enemy(p)
 end
 
 ---------------------------------------------------------------------
--- NEAREST TARGET (оптимизировано)
+-- NEAREST TARGET
 ---------------------------------------------------------------------
 
 local nearestTarget = nil
@@ -78,7 +77,7 @@ local function nearest()
 end
 
 ---------------------------------------------------------------------
--- AUTO FLING ALL ENEMIES (оставлено)
+-- AUTO FLING ALL ENEMIES
 ---------------------------------------------------------------------
 
 local fling_all = false
@@ -134,20 +133,20 @@ task.spawn(function()
 end)
 
 ---------------------------------------------------------------------
--- TP UNDER PLAYERS
+-- TP UNDER PLAYERS (перенесено из Kill ppl)
 ---------------------------------------------------------------------
 
 local tp_on = false
 local tp_offset = -6
 local tp_speed = 0.25
 
-tabKill:CreateToggle({
+tabCombat:CreateToggle({
     Name="TP under players",
     CurrentValue=false,
     Callback=function(v) tp_on=v end
 })
 
-tabKill:CreateSlider({
+tabCombat:CreateSlider({
     Name="TP depth",
     Range={-20,0},
     Increment=1,
@@ -155,7 +154,7 @@ tabKill:CreateSlider({
     Callback=function(v) tp_offset=v end
 })
 
-tabKill:CreateSlider({
+tabCombat:CreateSlider({
     Name="TP tween speed",
     Range={0.05,1},
     Increment=0.05,
@@ -178,203 +177,7 @@ Run.Heartbeat:Connect(function()
 end)
 
 ---------------------------------------------------------------------
--- TOWER DAMAGE
----------------------------------------------------------------------
-
-local autoTower = false
-
-tabTower:CreateToggle({
-    Name="Auto damage main tower",
-    CurrentValue=false,
-    Callback=function(v) autoTower=v end
-})
-
-task.spawn(function()
-    while true do
-        task.wait(0.05)
-        if not autoTower then continue end
-        local tower = workspace:FindFirstChild("Map")
-            and workspace.Map:FindFirstChild("Map2")
-            and workspace.Map.Map2:FindFirstChild("Towers")
-            and workspace.Map.Map2.Towers:FindFirstChild("Tower1")
-        if tower then
-            local ev = RS.Events:FindFirstChild("FlingRemoteEvent")
-            if ev then ev:FireServer(tower) end
-        end
-    end
-end)
-
----------------------------------------------------------------------
--- CRYSTAL TWEEN
----------------------------------------------------------------------
-
-local crystalTweenOn = false
-local crystalPos = CFrame.new(-728, 72, 2063)
-local crystalTween = nil
-local crystalSpeed = 0.2 -- ОЧЕНЬ БЫСТРО
-
-tabTower:CreateToggle({
-    Name = "Tween to Crystal",
-    CurrentValue = false,
-    Callback = function(v)
-        crystalTweenOn = v
-        if not v and crystalTween then
-            crystalTween:Cancel()
-            crystalTween = nil
-        end
-    end
-})
-
-task.spawn(function()
-    while true do
-        task.wait(0.1)
-        if not crystalTweenOn then continue end
-
-        local c = char(lp)
-        local r = hrp(c)
-        if not c or not r then continue end
-
-        if crystalTween then
-            crystalTween:Cancel()
-        end
-
-        crystalTween = Tween:Create(
-            r,
-            TweenInfo.new(crystalSpeed, Enum.EasingStyle.Linear),
-            {CFrame = crystalPos}
-        )
-        crystalTween:Play()
-    end
-end)
-
-
----------------------------------------------------------------------
--- AUTO TEAM SWITCH
----------------------------------------------------------------------
-
-local autoTeamSwitch = false
-local lastBlue = 0
-local lastRed = 0
-local cooldown = false
-local cooldownTime = 2
-
-tabTower:CreateToggle({
-    Name="Auto Team Switch (Crystal Logic)",
-    CurrentValue=false,
-    Callback=function(v)
-        autoTeamSwitch = v
-        lastBlue = 0
-        lastRed = 0
-        cooldown = false
-    end
-})
-
-task.spawn(function()
-    while true do
-        task.wait(0.3)
-        if not autoTeamSwitch then continue end
-        local tower = workspace:FindFirstChild("Map")
-            and workspace.Map.Map2.Towers.Tower1
-            and workspace.Map.Map2.Towers.Tower1:FindFirstChild("HittersFolder")
-        if not tower then continue end
-
-        local blueVal = tower.Blue.Value
-        local redVal  = tower.Red.Value
-
-        if not cooldown then
-            if blueVal > lastBlue then
-                RS.Events.SelectTeamEvent:FireServer(Teams.Alpha)
-                cooldown = true
-                task.delay(cooldownTime, function() cooldown=false end)
-            end
-            if redVal > lastRed then
-                RS.Events.SelectTeamEvent:FireServer(Teams.Omega)
-                cooldown = true
-                task.delay(cooldownTime, function() cooldown=false end)
-            end
-        end
-
-        lastBlue = blueVal
-        lastRed = redVal
-    end
-end)
-
----------------------------------------------------------------------
--- AUTO TEAM SELECT
----------------------------------------------------------------------
-
-local auto_team = false
-local team_choice = "Alpha"
-
-tabTower:CreateDropdown({
-    Name="Team",
-    Options={"Alpha","Omega"},
-    CurrentOption="Alpha",
-    Callback=function(opt) team_choice=opt end
-})
-
-tabTower:CreateToggle({
-    Name="Auto select team",
-    CurrentValue=false,
-    Callback=function(v) auto_team=v end
-})
-
-task.spawn(function()
-    while true do
-        task.wait(0.3)
-        if not auto_team then continue end
-        local t = Teams:FindFirstChild(team_choice)
-        if t and lp.Team ~= t then
-            RS.Events.SelectTeamEvent:FireServer(t)
-        end
-    end
-end)
-
-
----------------------------------------------------------------------
--- CHESTS (ЖЁСТКИЙ СПАМ РЕМОТОВ)
----------------------------------------------------------------------
-
-local auto_medieval = false
-local auto_western = false
-
-tabChest:CreateToggle({
-    Name = "Auto Medieval Crate",
-    CurrentValue = false,
-    Callback = function(v)
-        auto_medieval = v
-    end
-})
-
-tabChest:CreateToggle({
-    Name = "Auto Western Crate",
-    CurrentValue = false,
-    Callback = function(v)
-        auto_western = v
-    end
-})
-
-local crateEvent = game:GetService("ReplicatedStorage")
-    :WaitForChild("Events")
-    :WaitForChild("Skins")
-    :WaitForChild("OpenCrateRemoteEvent")
-
-task.spawn(function()
-    while true do
-        task.wait(0.1) -- быстрый спам
-
-        if auto_medieval then
-            crateEvent:FireServer("MedievalCrate")
-        end
-
-        if auto_western then
-            crateEvent:FireServer("WesternCrate")
-        end
-    end
-end)
-
----------------------------------------------------------------------
--- TARGET LABEL
+-- SHOW TARGET (перенесено из Shit)
 ---------------------------------------------------------------------
 
 local label_on = false
@@ -414,9 +217,6 @@ local function makeLabel()
         if gui then gui:Destroy() end
         gui = nil
         label_on = false
-        if UI.Flags["TargetLabelToggle"] then
-            UI.Flags["TargetLabelToggle"]:Set(false)
-        end
     end)
 end
 
@@ -425,10 +225,9 @@ local function removeLabel()
     gui = nil
 end
 
-tabShit:CreateToggle({
+tabCombat:CreateToggle({
     Name="Show Target",
     CurrentValue=false,
-    Flag="TargetLabelToggle",
     Callback=function(v)
         label_on=v
         if v then makeLabel() else removeLabel() end
@@ -446,237 +245,119 @@ task.spawn(function()
 end)
 
 ---------------------------------------------------------------------
--- FLY
+-- HITBOX (перенесено из отдельной вкладки)
 ---------------------------------------------------------------------
 
-local fly_on = false
-local fly_speed = 70
-local BV, BG = nil, nil
-local move = {W=false,A=false,S=false,D=false,Q=false,E=false}
+local hitboxEnabled = false
+local hitboxSize = 5
+local hitboxTransparency = 0.7
+local hitboxColor = Color3.fromRGB(255, 0, 0)
+local rainbowHitbox = false
 
-UIS.InputBegan:Connect(function(i,gp)
-    if gp or not fly_on then return end
-    local kc = i.KeyCode
-    if kc == Enum.KeyCode.W then move.W=true end
-    if kc == Enum.KeyCode.A then move.A=true end
-    if kc == Enum.KeyCode.S then move.S=true end
-    if kc == Enum.KeyCode.D then move.D=true end
-    if kc == Enum.KeyCode.Space then move.Q=true end
-    if kc == Enum.KeyCode.LeftControl then move.E=true end
-end)
+local function applyHitbox(char)
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
 
-UIS.InputEnded:Connect(function(i)
-    local kc = i.KeyCode
-    if kc == Enum.KeyCode.W then move.W=false end
-    if kc == Enum.KeyCode.A then move.A=false end
-    if kc == Enum.KeyCode.S then move.S=false end
-    if kc == Enum.KeyCode.D then move.D=false end
-    if kc == Enum.KeyCode.Space then move.Q=false end
-    if kc == Enum.KeyCode.LeftControl then move.E=false end
-end)
+    if hitboxEnabled then
+        hrp.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+        hrp.Transparency = hitboxTransparency
+        hrp.Color = hitboxColor
+        hrp.Material = Enum.Material.Neon
+        hrp.CanCollide = false
+    else
+        hrp.Size = Vector3.new(2, 2, 1)
+        hrp.Transparency = 0
+        hrp.Color = Color3.fromRGB(255, 255, 255)
+        hrp.Material = Enum.Material.Plastic
+        hrp.CanCollide = true
+    end
+end
 
-Run.Stepped:Connect(function()
-    if fly_on then
-        local c = char(lp)
-        if c then
-            for _,v in ipairs(c:GetDescendants()) do
-                if v:IsA("BasePart") then
-                    v.CanCollide = false
-                end
-            end
+local function updateAllHitboxes()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= lp then
+            local c = char(plr)
+            if c then applyHitbox(c) end
         end
     end
+end
+
+Players.PlayerAdded:Connect(function(plr)
+    plr.CharacterAdded:Connect(function(c)
+        task.wait(1)
+        if hitboxEnabled then applyHitbox(c) end
+    end)
 end)
-
-Run.Heartbeat:Connect(function()
-    if not fly_on then return end
-    local c = char(lp)
-    local r = hrp(c)
-    if not c or not r then return end
-    if not BV then
-        BV = Instance.new("BodyVelocity", r)
-        BV.MaxForce = Vector3.new(1e6,1e6,1e6)
-    end
-    if not BG then
-        BG = Instance.new("BodyGyro", r)
-        BG.MaxTorque = Vector3.new(1e6,1e6,1e6)
-        BG.P = 1e5
-    end
-    BG.CFrame = workspace.CurrentCamera.CFrame
-    local dir = Vector3.zero
-    if move.W then dir += Vector3.new(0,0,-1) end
-    if move.S then dir += Vector3.new(0,0,1) end
-    if move.A then dir += Vector3.new(-1,0,0) end
-    if move.D then dir += Vector3.new(1,0,0) end
-    if move.Q then dir += Vector3.new(0,1,0) end
-    if move.E then dir += Vector3.new(0,-1,0) end
-    BV.Velocity = workspace.CurrentCamera.CFrame:VectorToWorldSpace(dir) * fly_speed
-end)
-
-local function stopFly()
-    if BV then BV:Destroy() BV=nil end
-    if BG then BG:Destroy() BG=nil end
-end
-
-tabShit:CreateToggle({
-    Name="Noclip Fly",
-    CurrentValue=false,
-    Callback=function(v)
-        fly_on=v
-        if not v then stopFly() end
-    end
-})
-
-tabShit:CreateSlider({
-    Name="Fly speed",
-    Range={20,200},
-    Increment=5,
-    CurrentValue=70,
-    Callback=function(v) fly_speed=v end
-})
-
----------------------------------------------------------------------
--- ENTER ARENA
----------------------------------------------------------------------
-
-tabShit:CreateButton({
-    Name="Enter arena",
-    Callback=function()
-        RS.Events.SpawnerRemoteEvent:FireServer()
-    end
-})
-
----------------------------------------------------------------------
--- DELETE MAP
----------------------------------------------------------------------
-
-local mapHidden = false
-local savedPlatform = nil
-
-local function getPlatform()
-    local m = workspace:FindFirstChild("Map")
-    if not m then return end
-    local m1 = m:FindFirstChild("Map1")
-    if not m1 then return end
-    local ap = m1:FindFirstChild("ArenaParts")
-    if not ap then return end
-    return ap:FindFirstChild("MainPlatform")
-end
-
-local function hidePlatform()
-    local plat = getPlatform()
-    if not plat then return end
-    if not savedPlatform then
-        savedPlatform = plat:Clone()
-        savedPlatform.Parent = nil
-    end
-    plat.Transparency = 1
-    plat.CanCollide = false
-end
-
-local function showPlatform()
-    local plat = getPlatform()
-    if plat then
-        plat.Transparency = 0
-        plat.CanCollide = true
-        return
-    end
-    if savedPlatform then
-        savedPlatform.Parent = workspace.Map.Map1.ArenaParts
-    end
-end
-
-tabShit:CreateToggle({
-    Name = "Delete map",
-    CurrentValue = false,
-    Callback = function(v)
-        mapHidden = v
-        if v then hidePlatform() else showPlatform() end
-    end
-})
-
----------------------------------------------------------------------
--- AUTO SPAWN (RIDERS)
----------------------------------------------------------------------
-
-local autoSpawn = false
-
-local function checkSpawn()
-    if not autoSpawn then return end
-
-    local riders = workspace:FindFirstChild("Riders")
-    if not riders then return end
-
-    if not riders:FindFirstChild(lp.Name) then
-        task.delay(2, function()
-            if not autoSpawn then return end
-
-            local riders2 = workspace:FindFirstChild("Riders")
-            if riders2 and riders2:FindFirstChild(lp.Name) then return end
-
-            local ev = RS:FindFirstChild("Events") and RS.Events:FindFirstChild("SpawnerRemoteEvent")
-            if ev then
-                ev:FireServer()
-            end
-        end)
-    end
-end
 
 task.spawn(function()
     while true do
-        task.wait(0.5)
-        checkSpawn()
+        task.wait(0.3)
+        if hitboxEnabled then
+            updateAllHitboxes()
+        end
     end
 end)
-
-tabShit:CreateToggle({
-    Name="Auto spawn",
-    CurrentValue=false,
-    Callback=function(v)
-        autoSpawn = v
-        if v then checkSpawn() end
-    end
-})
----------------------------------------------------------------------
--- AUTO MODE VOTE (FFA / TD)
----------------------------------------------------------------------
-
-local autoFFA = false
-local autoTD  = false
-
-local voteEvent = game:GetService("ReplicatedStorage")
-    :WaitForChild("Events")
-    :WaitForChild("MapVoteEvent")
-
-tabShit:CreateToggle({
-    Name = "Auto vote FFA",
-    CurrentValue = false,
-    Callback = function(v)
-        autoFFA = v
-    end
-})
-
-tabShit:CreateToggle({
-    Name = "Auto vote TD",
-    CurrentValue = false,
-    Callback = function(v)
-        autoTD = v
-    end
-})
 
 task.spawn(function()
+    local h = 0
     while true do
-        task.wait(0.2) -- быстрый спам
-
-        if autoFFA then
-            voteEvent:FireServer(1)
-        end
-
-        if autoTD then
-            voteEvent:FireServer(2)
+        task.wait(0.03)
+        if rainbowHitbox and hitboxEnabled then
+            h = (h + 0.003) % 1
+            hitboxColor = Color3.fromHSV(h, 1, 1)
+            updateAllHitboxes()
         end
     end
 end)
+
+tabCombat:CreateToggle({
+    Name = "Enable Hitbox",
+    CurrentValue = false,
+    Callback = function(v)
+        hitboxEnabled = v
+        updateAllHitboxes()
+    end
+})
+
+tabCombat:CreateSlider({
+    Name = "Hitbox Size",
+    Range = {0, 20},
+    Increment = 1,
+    Suffix = " studs",
+    CurrentValue = hitboxSize,
+    Callback = function(v)
+        hitboxSize = v
+        updateAllHitboxes()
+    end
+})
+
+tabCombat:CreateSlider({
+    Name = "Transparency",
+    Range = {0, 1},
+    Increment = 0.05,
+    CurrentValue = hitboxTransparency,
+    Callback = function(v)
+        hitboxTransparency = v
+        updateAllHitboxes()
+    end
+})
+
+tabCombat:CreateColorPicker({
+    Name = "Hitbox Color",
+    Color = hitboxColor,
+    Callback = function(v)
+        hitboxColor = v
+        updateAllHitboxes()
+    end
+})
+
+tabCombat:CreateToggle({
+    Name = "Rainbow Hitbox",
+    CurrentValue = false,
+    Callback = function(v)
+        rainbowHitbox = v
+    end
+})
 
 
 local h = game:GetService("HttpService")
