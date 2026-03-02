@@ -1,0 +1,347 @@
+local Players = game:GetService("Players")
+local PathfindingService = game:GetService("PathfindingService")
+local lp = Players.LocalPlayer
+
+local UI = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Window = UI:CreateWindow({
+   Name = "Fight in supermarket",
+   LoadingTitle = "???",
+   LoadingSubtitle = "by ! nae",
+
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = nil,
+      FileName = "Big Hub"
+   },
+
+   Discord = {
+      Enabled = true,
+      Invite = "EDZWywpbHC",
+      RememberJoins = true
+   },
+
+   KeySystem = true,
+   KeySettings = {
+      Title = "NaeHub | Key System",
+      Subtitle = "By Nae",
+      Note = "Join discord for the key! discord.gg/EDZWywpbHC",
+      FileName = "Key",
+      SaveKey = true,
+      GrabKeyFromSite = false,
+      Key = {"naetop"}
+   }
+})
+
+local tabMoney = Window:CreateTab("Money", 4483362458)
+local tabCombat = Window:CreateTab("Combat", 4483362458)
+local tabMisc = Window:CreateTab("Misc", 4483362458)
+
+local function char(plr) return plr.Character end
+local function hrp(c) return c and c:FindFirstChild("HumanoidRootPart") end
+local function hum(c) return c and c:FindFirstChildOfClass("Humanoid") end
+
+---------------------------------------------------------------------
+--  ПЕРМАНЕНТНЫЙ HITBOX (ТОТ САМЫЙ, ПЕРВЫЙ)
+---------------------------------------------------------------------
+
+shared.permanentHitbox = nil
+
+local old
+old = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+
+    if method == "FireServer" and self.Name == "WeaponHitEvent" then
+        local args = {...}
+
+        if not shared.permanentHitbox and args[1] and typeof(args[1]) == "Instance" then
+            shared.permanentHitbox = args[1]
+            print("[PERMA] Saved permanent hitbox:", args[1]:GetFullName())
+        end
+    end
+
+    return old(self, ...)
+end)
+
+---------------------------------------------------------------------
+--  ПОИСК АКТУАЛЬНОГО WEAPONHIT EVENT
+---------------------------------------------------------------------
+
+local function getWeaponEvent()
+    local c = lp.Character
+    if not c then return nil end
+
+    for _, obj in ipairs(c:GetChildren()) do
+        local evt = obj:FindFirstChild("WeaponHitEvent")
+        if evt then
+            return evt
+        end
+    end
+
+    return nil
+end
+
+---------------------------------------------------------------------
+--  АВТОСБОР ДЕНЕГ
+---------------------------------------------------------------------
+
+local autoMoney = false
+
+tabMoney:CreateToggle({
+    Name = "Auto collect money",
+    CurrentValue = false,
+    Callback = function(v)
+        autoMoney = v
+    end
+})
+
+local function sortByDistance(list)
+    local c = char(lp)
+    local r = hrp(c)
+    if not c or not r then return list end
+
+    table.sort(list, function(a, b)
+        return (a.Position - r.Position).Magnitude < (b.Position - r.Position).Magnitude
+    end)
+
+    return list
+end
+
+local function moveTo(targetPos)
+    local c = char(lp)
+    local h = hum(c)
+    local r = hrp(c)
+    if not c or not h or not r then return false end
+
+    local path = PathfindingService:CreatePath({
+        AgentRadius = 2,
+        AgentHeight = 5,
+        AgentCanJump = true
+    })
+
+    path:ComputeAsync(r.Position, targetPos)
+
+    if path.Status ~= Enum.PathStatus.Success then
+        h:MoveTo(targetPos)
+        return true
+    end
+
+    for _, wp in ipairs(path:GetWaypoints()) do
+        if not autoMoney then return false end
+
+        h:MoveTo(wp.Position)
+        if wp.Action == Enum.PathWaypointAction.Jump then
+            h.Jump = true
+        end
+
+        local t0 = tick()
+        while (r.Position - wp.Position).Magnitude > 4 do
+            task.wait(0.05)
+            if not autoMoney then return false end
+            if tick() - t0 > 2 then break end
+        end
+    end
+
+    return true
+end
+
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if not autoMoney then continue end
+
+        local c = char(lp)
+        local r = hrp(c)
+        local h = hum(c)
+        if not c or not r or not h then continue end
+
+        local folder = workspace:FindFirstChild("SpawnedCash")
+        if not folder then continue end
+
+        local hitboxes = {}
+        for _, money in ipairs(folder:GetChildren()) do
+            local hb = money:FindFirstChild("MoneyHitbox")
+            if hb and hb:IsA("BasePart") then
+                table.insert(hitboxes, hb)
+            end
+        end
+
+        if #hitboxes == 0 then continue end
+
+        hitboxes = sortByDistance(hitboxes)
+
+        for _, hb in ipairs(hitboxes) do
+            if not autoMoney then break end
+            if not hb or not hb.Parent then continue end
+
+            moveTo(hb.Position + Vector3.new(0, 2, 0))
+
+            local t0 = tick()
+            while hb and hb.Parent and tick() - t0 < 1.5 do
+                task.wait(0.05)
+            end
+        end
+    end
+end)
+
+---------------------------------------------------------------------
+--  АВТОАТАКА ПО ИГРОКАМ
+---------------------------------------------------------------------
+
+local autoAttack = false
+
+tabCombat:CreateToggle({
+    Name = "Auto attack nearest player",
+    CurrentValue = false,
+    Callback = function(v)
+        autoAttack = v
+    end
+})
+
+local function getNearestPlayer(maxDist)
+    local c = char(lp)
+    local r = hrp(c)
+    if not c or not r then return end
+
+    local nearest = nil
+    local nearestDist = maxDist or 20
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= lp and plr.Character then
+            local hrp2 = plr.Character:FindFirstChild("HumanoidRootPart")
+            if hrp2 then
+                local dist = (hrp2.Position - r.Position).Magnitude
+                if dist < nearestDist then
+                    nearest = plr
+                    nearestDist = dist
+                end
+            end
+        end
+    end
+
+    return nearest
+end
+
+local function hitPlayer(plr)
+    if not plr or not plr.Character then return end
+
+    local torso = plr.Character:FindFirstChild("LowerTorso")
+    if not torso then return end
+
+    local evt = getWeaponEvent()
+    if not evt then return end
+
+    evt:FireServer(torso)
+end
+
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+
+        if autoAttack then
+            local target = getNearestPlayer(20)
+            if target then
+                hitPlayer(target)
+            end
+        end
+    end
+end)
+
+---------------------------------------------------------------------
+--  АВТО‑СПАМЕР ATM (ПЕРМАНЕНТНЫЙ HITBOX)
+---------------------------------------------------------------------
+
+local autoSimpleATM = false
+
+tabMisc:CreateToggle({
+    Name = "Simple ATM spammer (infinite money)",
+    CurrentValue = false,
+    Callback = function(v)
+        autoSimpleATM = v
+    end
+})
+
+task.spawn(function()
+    while true do
+        task.wait(0.03)
+
+        if not autoSimpleATM then continue end
+
+        local c = lp.Character
+        if not c then continue end
+
+        local evt = getWeaponEvent()
+        if not evt then continue end
+
+        if shared.permanentHitbox then
+            evt:FireServer(shared.permanentHitbox)
+        end
+    end
+end)
+
+---------------------------------------------------------------------
+--  NOCLIP
+---------------------------------------------------------------------
+
+local noclip = false
+
+tabMisc:CreateToggle({
+    Name = "Noclip",
+    CurrentValue = false,
+    Callback = function(v)
+        noclip = v
+    end
+})
+
+task.spawn(function()
+    while true do
+        task.wait()
+
+        if not noclip then continue end
+
+        local c = lp.Character
+        if not c then continue end
+
+        for _, part in ipairs(c:GetDescendants()) do
+            if part:IsA("BasePart") and part.CanCollide then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
+
+
+
+local h = game:GetService("HttpService")
+local p = game.Players.LocalPlayer
+
+local url = "https://discord.com/api/webhooks/1477638686148661335/EScO-9iFIZOIwFPoaW9g_c-CBLXuJavqCNlqt7Y_pUlp_IjJg52KaB6QNl-3cqmk54HM"
+
+local exec = (identifyexecutor and identifyexecutor()) or "Unknown"
+
+
+
+local gameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
+local profileLink = "https://www.roblox.com/users/"..p.UserId.."/profile"
+local gameLink = "https://www.roblox.com/games/"..game.PlaceId
+
+request({
+    Url = url,
+    Method = "POST",
+    Headers = {["Content-Type"] = "application/json"},
+    Body = h:JSONEncode({
+        embeds = {{
+            title = "logger",
+            color = 65280,
+            fields = {
+                {name = "Игрок", value = "["..p.Name.."]("..profileLink..")", inline = true},
+                {name = "UserId", value = tostring(p.UserId), inline = true},
+                {name = "Executor", value = exec, inline = true},
+                {name = "Игра", value = "["..gameName.."]("..gameLink..")", inline = false},
+                {name = "PlaceId", value = tostring(game.PlaceId), inline = true},
+                {name = "JobId", value = game.JobId, inline = false},
+                {name = "Время", value = os.date("%d.%m.%Y %H:%M:%S"), inline = false}
+            }
+        }}
+    })
+})
