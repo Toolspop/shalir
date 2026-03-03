@@ -41,9 +41,6 @@ local function char(plr) return plr.Character end
 local function hrp(c) return c and c:FindFirstChild("HumanoidRootPart") end
 local function hum(c) return c and c:FindFirstChildOfClass("Humanoid") end
 
----------------------------------------------------------------------
---  ПЕРМАНЕНТНЫЙ HITBOX (ТОТ САМЫЙ, ПЕРВЫЙ)
----------------------------------------------------------------------
 
 shared.permanentHitbox = nil
 
@@ -63,9 +60,6 @@ old = hookmetamethod(game, "__namecall", function(self, ...)
     return old(self, ...)
 end)
 
----------------------------------------------------------------------
---  ПОИСК АКТУАЛЬНОГО WEAPONHIT EVENT
----------------------------------------------------------------------
 
 local function getWeaponEvent()
     local c = lp.Character
@@ -81,9 +75,7 @@ local function getWeaponEvent()
     return nil
 end
 
----------------------------------------------------------------------
---  АВТОСБОР ДЕНЕГ
----------------------------------------------------------------------
+
 
 local autoMoney = false
 
@@ -184,9 +176,7 @@ task.spawn(function()
     end
 end)
 
----------------------------------------------------------------------
---  АВТОАТАКА ПО ИГРОКАМ
----------------------------------------------------------------------
+
 
 local autoAttack = false
 
@@ -247,9 +237,7 @@ task.spawn(function()
     end
 end)
 
----------------------------------------------------------------------
---  АВТО‑СПАМЕР ATM (ПЕРМАНЕНТНЫЙ HITBOX)
----------------------------------------------------------------------
+
 
 local autoSimpleATM = false
 
@@ -279,9 +267,7 @@ task.spawn(function()
     end
 end)
 
----------------------------------------------------------------------
---  NOCLIP
----------------------------------------------------------------------
+
 
 local noclip = false
 
