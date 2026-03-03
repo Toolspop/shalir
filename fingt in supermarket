@@ -295,6 +295,116 @@ task.spawn(function()
         end
     end
 end)
+-- === UNIVERSAL PRICE ESP SYSTEM ===
+
+local YELLOW = Color3.fromRGB(253, 255, 142)
+local BLUE   = Color3.fromRGB(112, 253, 255)
+
+local priceESP_Yellow = false
+local priceESP_Blue = false
+
+tabMisc:CreateToggle({
+    Name = "Price ESP (yellow)",
+    CurrentValue = false,
+    Callback = function(v)
+        priceESP_Yellow = v
+        if not v then
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                local gui = obj:FindFirstChild("PriceESP_Yellow")
+                if gui then
+                    gui:Destroy()
+                end
+            end
+        end
+    end
+})
+
+tabMisc:CreateToggle({
+    Name = "Price ESP (blue)",
+    CurrentValue = false,
+    Callback = function(v)
+        priceESP_Blue = v
+        if not v then
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                local gui = obj:FindFirstChild("PriceESP_Blue")
+                if gui then
+                    gui:Destroy()
+                end
+            end
+        end
+    end
+})
+
+local function findAdornee(tag)
+    local parent = tag.Parent
+    while parent do
+        for _, obj in ipairs(parent:GetChildren()) do
+            if obj:IsA("BasePart") then
+                return obj
+            end
+        end
+        parent = parent.Parent
+    end
+    return nil
+end
+
+local function createESP(tag, name, color)
+    if tag:FindFirstChild(name) then return end
+
+    local adornee = findAdornee(tag)
+    if not adornee then return end
+
+    local gui = Instance.new("BillboardGui")
+    gui.Name = name
+    gui.Size = UDim2.new(0, 120, 0, 35)
+    gui.AlwaysOnTop = true
+    gui.Adornee = adornee
+    gui.Parent = tag
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.TextScaled = true
+    label.Font = Enum.Font.GothamBold
+    label.TextColor3 = color
+    label.Text = tag.Text or "???"
+    label.Parent = gui
+end
+
+local function cleanupInvalidESP()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BillboardGui") then
+            if (obj.Name == "PriceESP_Yellow" or obj.Name == "PriceESP_Blue") then
+                if not obj.Adornee or not obj.Parent or not obj.Parent:IsDescendantOf(workspace) then
+                    obj:Destroy()
+                end
+            end
+        end
+    end
+end
+
+local function scanTags()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+            if priceESP_Yellow and obj.TextColor3 == YELLOW then
+                createESP(obj, "PriceESP_Yellow", Color3.fromRGB(255, 255, 0))
+            end
+            if priceESP_Blue and obj.TextColor3 == BLUE then
+                createESP(obj, "PriceESP_Blue", Color3.fromRGB(112, 253, 255))
+            end
+        end
+    end
+end
+
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        if priceESP_Yellow or priceESP_Blue then
+            scanTags()
+            cleanupInvalidESP()
+        end
+    end
+end)
 
 
 
